@@ -293,7 +293,7 @@ namespace BaiduPanConsole
                             }
                             if (!string.IsNullOrEmpty(token))
                             {
-                                AddOrUpdateAppSetting("AccessToken", t);
+                                AddOrUpdateAppSetting("AccessToken", token);
                                 Console.WriteLine("百度盘登录成功");
                                 _ = Task.Run(async () =>
                                 {
