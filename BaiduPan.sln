@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33815.320
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BaiduPanApi", "BaiduPanApi\BaiduPanApi.csproj", "{2EEF4A5B-7AFF-4D03-A79F-73E43675F1A0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BaiduPanConsole", "BaiduPanConsole\BaiduPanConsole.csproj", "{3ABE67F7-E909-426A-9C6C-A00D6193C813}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2EEF4A5B-7AFF-4D03-A79F-73E43675F1A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2EEF4A5B-7AFF-4D03-A79F-73E43675F1A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2EEF4A5B-7AFF-4D03-A79F-73E43675F1A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2EEF4A5B-7AFF-4D03-A79F-73E43675F1A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3ABE67F7-E909-426A-9C6C-A00D6193C813}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3ABE67F7-E909-426A-9C6C-A00D6193C813}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3ABE67F7-E909-426A-9C6C-A00D6193C813}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3ABE67F7-E909-426A-9C6C-A00D6193C813}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B527642A-3914-4CAD-BE7F-4E12759AA80E}
+	EndGlobalSection
+EndGlobal
