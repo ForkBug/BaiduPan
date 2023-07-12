@@ -16,6 +16,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Humanizer.Bytes;
+using System.Runtime.InteropServices;
 
 namespace BaiduPanConsole
 {
@@ -25,7 +26,7 @@ namespace BaiduPanConsole
         ActionBlock<ValueTuple<BaiduPanFileInfo, string, DownloadPackage?>> downloadqueue;
 
         //Timer ProgbarUpdate;
-        ProgressBar ConsoleProgress;
+        ProgressBar? ConsoleProgress;
         ProgressBarOptions ChildOption;
         ProgressBarOptions ProcessBarOption;
         ulong totalsize;
@@ -36,7 +37,7 @@ namespace BaiduPanConsole
 
         ILogger<Download> Logger;
 
-        public Download(BaiduPanApi.BaiduPanApiClient baiduPanApiClient,int concurrentdownload, int chunknum,int memory,ILogger<Download> logger1)
+        public Download(BaiduPanApi.BaiduPanApiClient baiduPanApiClient,int concurrentdownload, int chunknum,int memory,bool disableproxy,ILogger<Download> logger1)
         {
             Logger = logger1;
             cancellationSource = new CancellationTokenSource();
@@ -59,20 +60,27 @@ namespace BaiduPanConsole
                 RequestConfiguration =
                 {
                     KeepAlive = true, // default value is false
-                    UserAgent="pan.baidu.com"
+                    UserAgent="pan.baidu.com",
                 }
             };
-            ProcessBarOption = new ProgressBarOptions
+            if (disableproxy)
+            {
+                CurrentDownloadConfiguration.RequestConfiguration.Proxy = new NoProxy();
+            }
+            ProcessBarOption = new ProgressBarOptions()
             {
                 ForegroundColor = ConsoleColor.Blue,
                 ForegroundColorDone = ConsoleColor.DarkGreen,
                 BackgroundColor = ConsoleColor.DarkGray,
                 BackgroundCharacter = '=',
-                EnableTaskBarProgress = true,
                 ProgressBarOnBottom = false,
                 //DisplayTimeInRealTime = false,
-                ProgressCharacter = '>'
+                ProgressCharacter = '>',
             };
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                ProcessBarOption.EnableTaskBarProgress = true;
+            }
             ChildOption = new ProgressBarOptions
             {
                 ForegroundColor = ConsoleColor.Green,
@@ -83,8 +91,7 @@ namespace BaiduPanConsole
             };
 
 
-            ConsoleProgress = new ProgressBar(10000, $"正在获取服务器上文件夹内容...   ", ProcessBarOption);
-            //ProgbarUpdate = new Timer(x => ConsoleProgress.Tick(), null, 2000, 1500);
+            //
         }
         public bool IsChinese(string text)
         {
@@ -94,6 +101,21 @@ namespace BaiduPanConsole
         {
             try
             {
+                if (totalsize == 0)
+                {
+                    Interlocked.Add(ref totalsize, 1);
+                }
+
+                ProgressBar? mainprogressBar = null;
+                lock (this)
+                {
+                    if (ConsoleProgress==null)
+                    {
+                        ConsoleProgress = new ProgressBar(10000, 
+                            $"{((long)completedsize).Bytes().Humanize()}/{((long)totalsize).Bytes().Humanize()}", ProcessBarOption);
+                    }
+                    mainprogressBar = ConsoleProgress;
+                }
                 var downloader = new DownloadService(CurrentDownloadConfiguration);
 
                 string subtitle = tuple.Item1.path;
@@ -110,14 +132,14 @@ namespace BaiduPanConsole
                 {
                     subtitle = tuple.Item1.path;
                 }
-                using var progress = ConsoleProgress.Spawn(10000, subtitle.Trim(), ChildOption);
+                using var progress = mainprogressBar.Spawn(10000, subtitle.Trim(), ChildOption);
                 downloader.DownloadProgressChanged += (sender, e) =>
                 {
                     progress.Tick((int)(e.ProgressPercentage * 100));
                 };
 
 
-                var info = await panApiClient.GetFileInfoAsync(tuple.Item1.fs_id);
+                var info = await panApiClient.GetFileInfoAsync(tuple.Item1.fs_id, cancellationSource.Token);
                 var url = panApiClient.GetDownloadFileUrl(info);
                 string tmpfile;
                 if (tuple.Item3==null)
@@ -149,12 +171,8 @@ namespace BaiduPanConsole
                     Logger.LogDebug("正在下载 {filename} 到 {localpath}", tuple.Item1.path, tuple.Item2);
                     progress.Tick(10000);
                     completedsize += (ulong)tuple.Item1.size;
-                    if (totalsize == 0)
-                    {
-                        Interlocked.Add(ref totalsize, 1);
-                    }
-                    ConsoleProgress.Tick((int)(completedsize * 10000 / totalsize));
-                    ConsoleProgress.Message = $"{((long)completedsize).Bytes().Humanize()}/{((long)totalsize).Bytes().Humanize()}";
+                    mainprogressBar.Tick((int)(completedsize * 10000 / totalsize));
+                    mainprogressBar.Message = $"{((long)completedsize).Bytes().Humanize()}/{((long)totalsize).Bytes().Humanize()}";
                 }
             }
             catch (Exception e)
@@ -165,18 +183,12 @@ namespace BaiduPanConsole
 
 
 
-        bool MsgFixed = false;
         internal void AddDownloadFile(BaiduPanFileInfo item, string l)
         {
             //             string[] filesArray = l.Split(Path.AltDirectorySeparatorChar,Path.DirectorySeparatorChar);
             //             var invalids = System.IO.Path.GetInvalidFileNameChars();
             //             var newName = String.Join("_", l.Split(invalids, StringSplitOptions.None)).TrimEnd('.');
 
-            if (MsgFixed)
-            {
-                ConsoleProgress.Message = "正在下载...";
-                MsgFixed = true;
-            }
             downloadqueue.Post((item, l,null));
 
             Interlocked.Add(ref totalsize, (ulong)item.size);
@@ -204,7 +216,7 @@ namespace BaiduPanConsole
             }
 
             //ProgbarUpdate.Dispose();
-            ConsoleProgress.Dispose();
+            ConsoleProgress?.Dispose();
             disposedValue = true;
 
             return snapshot;
@@ -218,7 +230,6 @@ namespace BaiduPanConsole
                     Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(package.Item2.FileName)));
                 Interlocked.Add(ref totalsize, (ulong) package.Item1.size);
                 downloadqueue.Post((package.Item1, p, package.Item2));
-                ConsoleProgress.Message = "继续下载...";
             }
         }
 
@@ -229,7 +240,7 @@ namespace BaiduPanConsole
                 if (disposing)
                 {
                     //ProgbarUpdate.Dispose();
-                    ConsoleProgress.Dispose();
+                    ConsoleProgress?.Dispose();
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer

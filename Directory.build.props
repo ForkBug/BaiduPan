@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <Copyright>Copyright (c) 2023</Copyright>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <VersionMajor>0</VersionMajor>
+    <VersionMinor>1</VersionMinor>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <VersionPrefix>$(VersionMajor).$(VersionMinor)</VersionPrefix>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GenerateReleaseNotes Condition="'$(GenerateReleaseNotes)' == ''">false</GenerateReleaseNotes>
+    <GenerateAssemblyBuildDateAttribute Condition="'$(GenerateAssemblyBuildDateAttribute)' == ''">true</GenerateAssemblyBuildDateAttribute>
+  </PropertyGroup>
+</Project>

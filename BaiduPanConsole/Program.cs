@@ -147,8 +147,13 @@ namespace BaiduPanConsole
                 return -1;
             }
 
+            HttpClientHandler handler = new HttpClientHandler();
+            if (Configuration.GetValue<int>("UsingProxy", 1) == 0)//disable
+            {
+                handler.Proxy = new NoProxy();
+            }
 
-            baiduPanApiClient = new BaiduPanApiClient(str, new HttpClient(), serilogLoggerFactory.CreateLogger<BaiduPanApiClient>(),
+            baiduPanApiClient = new BaiduPanApiClient(str, new HttpClient(handler), serilogLoggerFactory.CreateLogger<BaiduPanApiClient>(),
                 Configuration.GetValue<int>("ApiParallelismDegree", 6));
             return 0;
         }
@@ -336,7 +341,7 @@ namespace BaiduPanConsole
         {
             try
             {
-                var filePath = Path.Combine(AppContext.BaseDirectory, "appSettings.json");
+                var filePath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
                 string json = File.ReadAllText(filePath);
                 if (json == null)
                 {
@@ -453,15 +458,18 @@ namespace BaiduPanConsole
                 using var dl = new Download(baiduPanApiClient, Configuration.GetValue<int>("DownloadParallelismDegree", 6),
                     Configuration.GetValue<int>("DownloadChunkNum", 3),
                     mem,
+                    Configuration.GetValue<int>("UsingProxy", 1)==0,
                     serilogLoggerFactory.CreateLogger<Download>());
 
                 TaskCompletionSource<int>? tcs = null;
+                var cts = new CancellationTokenSource();
                 Console.CancelKeyPress += (object? sender, ConsoleCancelEventArgs e) =>
                 {
                     tcs = new TaskCompletionSource<int>();
                     try
                     {
                         Log.Logger.Information("Cancel key pressed. Saving downloading info for resuming");
+                        cts.Cancel();
                         var s = dl.Pause().ConfigureAwait(false).GetAwaiter().GetResult();
                         var snap = new DownloadSnapshot(opts, s);
                         AddOrUpdateAppSetting("DownloadSnapshot", JsonConvert.SerializeObject(snap));
@@ -487,29 +495,35 @@ namespace BaiduPanConsole
                 {
                     re = new Regex(opts.Filter.Trim());
                 }
-
-                await foreach (var item in baiduPanApiClient.ListAllFilesRecursivelyAsync(opts.Serverpath, re, default))
+                try
                 {
-                    if (fsids != null)
+                    Console.WriteLine("获取文件列表并和本地文件对比...");
+                    await foreach (var item in baiduPanApiClient.ListAllFilesAsync(opts.Serverpath, re, cts.Token))
                     {
-                        if (fsids.Contains(item.fs_id))
+                        if (fsids != null)
                         {
-                            continue;
+                            if (fsids.Contains(item.fs_id))
+                            {
+                                continue;
+                            }
+                        }
+                        var rp = Path.GetRelativePath(opts.Serverpath, item.path);
+                        var l = GetLocalPath(rp, opts.LocalPath);
+                        if (!Filelookalikeidentical(item, l))
+                        {
+                            if (!item.isdir)
+                            {
+                                dl.AddDownloadFile(item, l);
+                            }
+                            else
+                            {
+                                Directory.CreateDirectory(l);
+                            }
                         }
                     }
-                    var rp = Path.GetRelativePath(opts.Serverpath, item.path);
-                    var l = GetLocalPath(rp, opts.LocalPath);
-                    if (!Filelookalikeidentical(item, l))
-                    {
-                        if (!item.isdir)
-                        {
-                            dl.AddDownloadFile(item, l);
-                        }
-                        else
-                        {
-                            Directory.CreateDirectory(l);
-                        }
-                    }
+                }
+                catch (OperationCanceledException)
+                {
                 }
 
                 try
@@ -645,7 +659,7 @@ namespace BaiduPanConsole
                 {
                     if (opts.NoFolder)
                     {
-                        await foreach (var item in baiduPanApiClient.ListAllFilesAsync(opts.Serverpath))
+                        await foreach (var item in baiduPanApiClient.ListAllFilesAsync(opts.Serverpath, re,default))
                         {
                             Console.WriteLine(item.path);
                         }
@@ -662,7 +676,7 @@ namespace BaiduPanConsole
                 {
                     if (opts.NoFolder)
                     {
-                        await foreach (var item in baiduPanApiClient.ListAllFilesAsync(opts.Serverpath))
+                        await foreach (var item in baiduPanApiClient.ListAllFilesAsync(opts.Serverpath,re, default))
                         {
                             Console.WriteLine(item.path);
                         }

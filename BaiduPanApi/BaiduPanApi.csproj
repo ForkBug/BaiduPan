@@ -3,8 +3,24 @@
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
 	  <LangVersion>preview</LangVersion>
+	  <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	  <PackageId>Yab.BaiduPan</PackageId>
+	  <Title>BaiduPan SDK</Title>
+	  <Authors>Forkbug</Authors>
+	  <Description>BaiduPan SDK</Description>
+	  <PackageProjectUrl>https://github.com/ForkBug/BaiduPan/</PackageProjectUrl>
+	  <PackageReadmeFile>README.md</PackageReadmeFile>
+	  <RepositoryUrl>https://github.com/ForkBug/BaiduPan/</RepositoryUrl>
+	  <PackageTags>Baidu;BaiduPan;SDK</PackageTags>
 
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />

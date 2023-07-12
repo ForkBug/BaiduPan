@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -48,6 +49,7 @@ namespace BaiduPanApi
         string HostName = "pan.baidu.com";
         ILogger<BaiduPanApiClient> logger;
         int ParallDegree;
+
         public BaiduPanApiClient(string accessToken, HttpClient client, ILogger<BaiduPanApiClient> logger, int parallDegree)
         {
             AccessToken = accessToken;
@@ -62,26 +64,47 @@ namespace BaiduPanApi
         /// </summary>
         /// <param name="msg"></param>
         /// <returns></returns>
-        protected async Task<HttpResponseMessage> GetResponse(string url)
+        protected async Task<HttpResponseMessage> GetResponse(string url, CancellationToken cancellationToken)
         {
             Exception e = null;
-            for (int i = 0; i <= 3; ++i)
+            HttpResponseMessage ret = null;
+            for (int i = 0; i < 3; ++i)
             {
                 try
                 {
                     HttpRequestMessage msg=new HttpRequestMessage(HttpMethod.Get, url);
-                    return await client.SendAsync(msg);
-
+                    var resp =  await client.SendAsync(msg, cancellationToken);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        return resp;
+                    }
+                    if (resp.StatusCode==System.Net.HttpStatusCode.Unauthorized)
+                    {
+                        return resp;
+                    }
+                    logger.LogTrace("{RequestUri} return {StatusCode}", url, resp.StatusCode);
+                    ret = resp;
+                }
+                catch(TaskCanceledException)
+                {
+                    throw e;
                 }
                 catch (Exception ex)
                 {
                     logger.LogTrace("Exception occurs when sending {RequestUri}, message {Message}", url, ex.Message);
                     e = ex;
                 }
-                await Task.Delay(1000 * (i + 1));
+                if (i!=2)
+                {
+                    await Task.Delay(1500 * (i + 1));
+                }
             }
-            logger.LogError("Exception occurs when sending {RequestUri}, message {Message}", url, e.Message);
-            throw e;
+            if (e!=null)
+            {
+                logger.LogError("Exception occurs when sending {RequestUri}, message {Message}", url, e.Message);
+                throw e;
+            }
+            return ret;
         }
 
 
@@ -102,7 +125,18 @@ namespace BaiduPanApi
             return strb.ToString();
         }
 
-        public async IAsyncEnumerable<BaiduPanFileInfo> ListAllFilesAsync(string path,int limit=10000)
+
+        /// <summary>
+        /// listall接口的请求频率建议不超过每分钟8-10次
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="re"></param>
+        /// <param name="cancellationToken"></param>
+        /// <param name="limit"></param>
+        /// <returns></returns>
+        /// <exception cref="BaiduException"></exception>
+        public async IAsyncEnumerable<BaiduPanFileInfo> ListAllFilesAsync(string path, Regex re,
+            [EnumeratorCancellation] CancellationToken cancellationToken, int limit = 10000)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -111,18 +145,24 @@ namespace BaiduPanApi
             long start = 0;
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var parms = new List<ValueTuple<string, string>>()
                 {
                     ( "start",start.ToString() ),
                     ("recursion","1"),
                     ("limit",limit.ToString()),
-                    ("path",HttpUtility.UrlEncode(path))
+                    ("path",path)
                 };
                 var strpath = BuildApiUrl(HostName, "/rest/2.0/xpan/multimedia?method=listall", parms);
 
-                var resp = await GetResponse(strpath);
-                resp.EnsureSuccessStatusCode();
-                var str = await resp.Content.ReadAsStringAsync();
+                var resp = await GetResponse(strpath, cancellationToken);
+                var deley =  Task.Delay(8000);//百度有流控
+                if (!resp.IsSuccessStatusCode)
+                {
+                    logger.LogError("获取文件/夹信息失败{0},错误信息{1}，可以稍后重试", path, resp.StatusCode);
+                    yield break;
+                }
+                var str = await resp.Content.ReadAsStringAsync(cancellationToken);
                 JObject obj = JObject.Parse(str);
                 int err = obj.Value<int>("errno");
                 if (err != 0)
@@ -138,23 +178,30 @@ namespace BaiduPanApi
                 }
                 foreach (var i in obj["list"])
                 {
-                    yield return i.ToObject<BaiduPanFileInfo>();
+                    var item = i.ToObject<BaiduPanFileInfo>();
+                    if ((re != null) && (re.IsMatch(item.path)))
+                    {
+                        logger.LogDebug("Filter out {file}", item.path);
+                        continue;
+                    }
+                    yield return item;
                 }
                 long has_more = obj.Value<long>("has_more");
-                if (has_more==0)
+                if (has_more == 0)
                 {
                     yield break;
                 }
                 start = obj.Value<long>("cursor");
+                await deley;
             }
 
         }
 
-        public async ValueTask<BaiduPanFileInfo> GetFileInfoAsync(string fsids)
+        public async ValueTask<BaiduPanFileInfo> GetFileInfoAsync(string fsids, CancellationToken cancellationToken)
         {
-            return (await GetFileInfoAsync(new string[] { fsids })).FirstOrDefault();
+            return (await GetFileInfoAsync(new string[] { fsids }, cancellationToken)).FirstOrDefault();
         }
-        public async ValueTask<List<BaiduPanFileInfo>> GetFileInfoAsync(string[] fsids)
+        public async ValueTask<List<BaiduPanFileInfo>> GetFileInfoAsync(string[] fsids,CancellationToken cancellationToken)
         {
             if (fsids.Length==0 || (fsids.Length>100))
             {
@@ -169,8 +216,12 @@ namespace BaiduPanApi
             var strpath = BuildApiUrl(HostName, "/rest/2.0/xpan/multimedia?method=filemetas", parms);
 
 
-            var resp = await GetResponse(strpath);
-            resp.EnsureSuccessStatusCode();
+            var resp = await GetResponse(strpath, cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                Console.WriteLine("获取文件/夹信息失败{path},错误信息{error}，可以稍后重试", string.Join(',', fsids), resp.StatusCode);
+                return new List<BaiduPanFileInfo>();
+            }
             var str = await resp.Content.ReadAsStringAsync();
             JObject obj = JObject.Parse(str);
             int err = obj.Value<int>("errno");
@@ -200,13 +251,14 @@ namespace BaiduPanApi
         }
 
 
-        public async ValueTask<List<BaiduPanFileInfo>> ListFilesAsync(string path)
+        public async ValueTask<List<BaiduPanFileInfo>> ListFilesAsync(string path, CancellationToken cancellationToken)
         {
             List<BaiduPanFileInfo> lis = new();
             long start = 0;
             int limit = 1000;
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var parms = new List<ValueTuple<string, string>>()
                 {
                     ( "start",start.ToString() ),
@@ -221,8 +273,12 @@ namespace BaiduPanApi
                 var strpath = BuildApiUrl(HostName, "/rest/2.0/xpan/file?method=list", parms);
 
 
-                var resp = await GetResponse(strpath);
-                resp.EnsureSuccessStatusCode();
+                var resp = await GetResponse(strpath, cancellationToken);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("获取文件/夹信息失败{path},错误信息{error}，可以稍后重试", path, resp.StatusCode);
+                    return lis;
+                }
                 var str = await resp.Content.ReadAsStringAsync();
                 JObject obj = JObject.Parse(str);
                 int err = obj.Value<int>("errno");
@@ -259,15 +315,14 @@ namespace BaiduPanApi
         }
         async IAsyncEnumerable<BaiduPanFileInfo> ProcessOneBaiduPanFileInfo(BaiduPanFileInfo info,
             TransformManyBlock<BaiduPanFileInfo, BaiduPanFileInfo> manyBlock,
-            LongRefHelp foldercount,
-            System.Text.RegularExpressions.Regex re)
+            LongRefHelp foldercount,Regex re, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             yield return info;
 
             long count = 0;
             if (info.isdir)
             {
-                var ret = await ListFilesAsync(info.path);
+                var ret = await ListFilesAsync(info.path, cancellationToken);
                 foreach (var item in ret)
                 {
                     if ((re != null) && (re.IsMatch(item.path)))
@@ -303,15 +358,16 @@ namespace BaiduPanApi
             }
         }
 
-        public async IAsyncEnumerable<BaiduPanFileInfo> ListAllFilesRecursivelyAsync(string path, System.Text.RegularExpressions.Regex re, [EnumeratorCancellation] CancellationToken cancellationToken)
+        public async IAsyncEnumerable<BaiduPanFileInfo> ListAllFilesRecursivelyAsync(string path, System.Text.RegularExpressions.Regex re,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
         {
 
-            var lis = await ListFilesAsync(path);
+            var lis = await ListFilesAsync(path, cancellationToken);
             if (lis.Count > 0)
             {
                 TransformManyBlock<BaiduPanFileInfo, BaiduPanFileInfo> refe = null;
                 var foldercount = new LongRefHelp { Num = 0 };
-                var trans = new TransformManyBlock<BaiduPanFileInfo, BaiduPanFileInfo>(b => ProcessOneBaiduPanFileInfo(b, refe, foldercount,re),
+                var trans = new TransformManyBlock<BaiduPanFileInfo, BaiduPanFileInfo>(b => ProcessOneBaiduPanFileInfo(b, refe, foldercount,re, cancellationToken),
                     new ExecutionDataflowBlockOptions { EnsureOrdered = false, MaxDegreeOfParallelism = ParallDegree });
                 refe = trans;
                 bool f = false;
