@@ -6,7 +6,9 @@ Yab是一款基于百度盘官方Api的高速命令行下载工具，支持Windo
 ----
 
 
-支持文件分片和多文件并发，可以跑满带宽。有的朋友使用百度GUI客户端就可以跑满带宽，但有的朋友不行。可以试试yab，并调整appsettings.json中的并发参数
+支持文件分片和多文件并发，可以跑满带宽。
+
+有的朋友使用百度GUI客户端就可以跑满带宽，但有的朋友不行。在此情况下可以试试yab，可以根据硬件情况调整appsettings.json中的并发参数
 ![markdown](https://raw.githubusercontent.com/ForkBug/BaiduPan/main/docs/bandwidth.png "下载截图")
 
 
