@@ -27,10 +27,10 @@ using System.Text;
 using Microsoft.Extensions.Hosting;
 using Serilog.Core;
 
-namespace BaiduPanConsole
+namespace Yab.ConsoleTool
 {
-    [Verb("list", HelpText = "列出该文件夹下全部内容，包括子文件夹内容")]
-    class ListOptions
+    [Verb("listall", HelpText = "列出该文件夹下全部内容，包括子文件夹内容")]
+    class ListAllOptions
     {
         [Option('p', "ServerPath", Required = false, HelpText = "Which folder will be enumerated? Omitted for root path")]
         public string? Serverpath { get; set; }
@@ -188,11 +188,12 @@ namespace BaiduPanConsole
             using var parser = new CommandLine.Parser(x => {
                 x.CaseInsensitiveEnumValues = false;
                 x.CaseSensitive = false;
+               x.AutoHelp = true;
             });
 
-            return await parser.ParseArguments<ListOptions, DiffOptions, DownloadOptions, ResumeOptions, LoginOptions>(args)
+            return await parser.ParseArguments<ListAllOptions, DiffOptions, DownloadOptions, ResumeOptions, LoginOptions>(args)
                 .MapResult(
-                (ListOptions opts) => RunListAndReturnExitCode(opts),
+                (ListAllOptions opts) => RunListAllAndReturnExitCode(opts),
                 (DiffOptions opts) => RunDiffAndReturnExitCode(opts),
                 (DownloadOptions opts) => RunDownloadAndReturnExitCode(opts),
                 (ResumeOptions opts) => RunResumeAndReturnExitCode(opts),
@@ -638,7 +639,7 @@ namespace BaiduPanConsole
             return false;
         }
 
-        private static async Task<int> RunListAndReturnExitCode(ListOptions opts)
+        private static async Task<int> RunListAllAndReturnExitCode(ListAllOptions opts)
         {
             try
             {

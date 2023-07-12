@@ -18,7 +18,7 @@ using System.Threading.Tasks.Dataflow;
 using Humanizer.Bytes;
 using System.Runtime.InteropServices;
 
-namespace BaiduPanConsole
+namespace Yab.ConsoleTool
 {
     internal class Download:IDisposable
     {

@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace BaiduPanConsole
+namespace Yab.ConsoleTool
 {
     class NoProxy : IWebProxy
     {
