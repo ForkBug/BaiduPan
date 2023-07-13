@@ -1,4 +1,4 @@
-﻿using BaiduPanApi;
+﻿using Yab.BaiduPanApi;
 using CommandLine.Text;
 using CommandLine;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -530,6 +530,7 @@ namespace Yab.ConsoleTool
                 try
                 {
                     await dl.Finish();
+                    Console.WriteLine("下载完成");
                 }
                 catch (TaskCanceledException)
                 {

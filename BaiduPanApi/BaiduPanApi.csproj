@@ -12,6 +12,8 @@
 	  <PackageReadmeFile>README.md</PackageReadmeFile>
 	  <RepositoryUrl>https://github.com/ForkBug/BaiduPan/</RepositoryUrl>
 	  <PackageTags>Baidu;BaiduPan;SDK</PackageTags>
+	  <RootNamespace>Yab.BaiduPanApi</RootNamespace>
+	  <AssemblyName>Yab.BaiduPanApi</AssemblyName>
 
   </PropertyGroup>
 
@@ -21,6 +23,7 @@
       <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
+
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />

@@ -1,3 +1,5 @@
+Remove-Item .\pubs\* -Recurse
+
 dotnet publish  --sc true /p:PublishSingleFile=true -c Release .\BaiduPanConsole\BaiduPanConsole.csproj -o .\pubs\win-x64        -r win-x64 
 dotnet publish                                      -c Release .\BaiduPanConsole\BaiduPanConsole.csproj -o .\pubs\win-x86        -r win-x86
 dotnet publish  --sc true /p:PublishSingleFile=true -c Release .\BaiduPanConsole\BaiduPanConsole.csproj -o .\pubs\win-arm        -r win-arm 

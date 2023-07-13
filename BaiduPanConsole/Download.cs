@@ -1,4 +1,4 @@
-﻿using BaiduPanApi;
+﻿using Yab.BaiduPanApi;
 using Downloader;
 using Humanizer;
 using Microsoft.Extensions.Logging;
@@ -74,7 +74,7 @@ namespace Yab.ConsoleTool
                 BackgroundColor = ConsoleColor.DarkGray,
                 BackgroundCharacter = '=',
                 ProgressBarOnBottom = false,
-                //DisplayTimeInRealTime = false,
+                //MessageEncodingName = System.Text.Encoding.UTF8.WebName,
                 ProgressCharacter = '>',
             };
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -87,7 +87,9 @@ namespace Yab.ConsoleTool
                 BackgroundColor = ConsoleColor.DarkGray,
                 ProgressCharacter = '\u2593',
                 ProgressBarOnBottom = true,
-                CollapseWhenFinished = true
+                CollapseWhenFinished = true,
+                DisplayTimeInRealTime = false,
+                //MessageEncodingName = System.Text.Encoding.UTF8.WebName
             };
 
 
@@ -118,7 +120,7 @@ namespace Yab.ConsoleTool
                 }
                 var downloader = new DownloadService(CurrentDownloadConfiguration);
 
-                string subtitle = tuple.Item1.path;
+                string subtitle = tuple.Item1.path.Trim();
                 int width = Console.WindowWidth - 18;
                 if (width>10)
                 {
@@ -132,7 +134,7 @@ namespace Yab.ConsoleTool
                 {
                     subtitle = tuple.Item1.path;
                 }
-                using var progress = mainprogressBar.Spawn(10000, subtitle.Trim(), ChildOption);
+                using var progress = mainprogressBar.Spawn(10000, subtitle, ChildOption);
                 downloader.DownloadProgressChanged += (sender, e) =>
                 {
                     progress.Tick((int)(e.ProgressPercentage * 100));
@@ -141,6 +143,10 @@ namespace Yab.ConsoleTool
 
                 var info = await panApiClient.GetFileInfoAsync(tuple.Item1.fs_id, cancellationSource.Token);
                 var url = panApiClient.GetDownloadFileUrl(info);
+                if (Path.GetDirectoryName(tuple.Item2) is var s && s!=null )
+                {
+                    Directory.CreateDirectory(s);
+                }
                 string tmpfile;
                 if (tuple.Item3==null)
                 {
@@ -150,7 +156,7 @@ namespace Yab.ConsoleTool
                 {
                     tmpfile = tuple.Item3.FileName;
                     tuple.Item3.Address = url;
-                    await downloader.DownloadFileTaskAsync(tuple.Item3);
+                    await downloader.DownloadFileTaskAsync(tuple.Item3, cancellationSource.Token);
                 }
 
                 if (cancellationSource.Token.IsCancellationRequested)
@@ -166,9 +172,15 @@ namespace Yab.ConsoleTool
                 }
                 else
                 {
-                    File.Move(tmpfile, tuple.Item2, true);
+                    try
+                    {
+                        File.Move(tmpfile, tuple.Item2, true);
+                    }
+                    catch (Exception)
+                    {
+                    }
 
-                    Logger.LogDebug("正在下载 {filename} 到 {localpath}", tuple.Item1.path, tuple.Item2);
+                    Logger.LogDebug("已下载 {filename} 到 {localpath}", tuple.Item1.path, tuple.Item2);
                     progress.Tick(10000);
                     completedsize += (ulong)tuple.Item1.size;
                     mainprogressBar.Tick((int)(completedsize * 10000 / totalsize));

@@ -1,5 +1,7 @@
 # Yab(Yet Another Baidupan console tool)百度盘命令行工具，和百度盘C# SDK
-Yab是一款基于百度盘官方Api的高速命令行下载工具，支持Windows，Linux和Macos。Yab特性均基于百度盘官方Api，并不支持破解限速。
+Yab是一款基于百度盘官方Api的高速命令行下载工具，支持Windows，Linux和MacOS。Yab特性均基于百度盘官方Api，并不支持破解限速。
+
+Yab运行并不需要安装百度盘客户端.
 
 ![markdown](https://raw.githubusercontent.com/ForkBug/BaiduPan/main/docs/download.png "下载截图")
 
@@ -15,7 +17,8 @@ Yab是一款基于百度盘官方Api的高速命令行下载工具，支持Windo
 
 ## 特性列表
 + 较低的资源占用率
-+ 较高的下载速度
++ 可以跑满带宽的下载速度
++ 支持Windows，Linux和MacOS
 + 列出服务器某文件夹下所有内容
 + 对比服务器和本地文件夹的不同
 + 仅下载本地没有下载的文件/夹

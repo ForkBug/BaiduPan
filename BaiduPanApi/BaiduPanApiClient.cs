@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using System.Web;
 
-namespace BaiduPanApi
+namespace Yab.BaiduPanApi
 {
     public class BaiduException : Exception
     {
